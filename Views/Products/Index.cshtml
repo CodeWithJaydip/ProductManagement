@@ -1,0 +1,338 @@
+﻿@{
+    ViewData["Title"] = "Product Management";
+}
+
+<h2>Product Management</h2>
+
+<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#productModal">
+    Add Product
+</button>
+
+<table id="productTable" class="table table-striped mt-4">
+    <thead>
+        <tr>
+            <th>Product ID</th>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Price</th>
+            <th>Quantity In Stock</th>
+            <th>Discount Percentage</th>
+            <th>Final Price</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- Product rows will be dynamically populated here -->
+    </tbody>
+</table>
+
+<!-- Bootstrap Modal Structure -->
+<div class="modal fade" id="productModal" tabindex="-1" role="dialog" aria-labelledby="productModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="productModalLabel">Add Product</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Form inside the modal -->
+                <form id="productForm">
+                    <input type="hidden" id="productId" />
+                    <div class="form-group">
+                        <label for="name">Name</label>
+                        <input type="text" id="name" class="form-control" required />
+                        <div class="text-danger" id="nameError"></div>
+                       
+                    </div>
+                    <div class="form-group">
+                        <label for="price">Price</label>
+                        <input type="number" id="price" class="form-control" required />
+                        <div class="text-danger" id="priceError"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantityInStock">Quantity In Stock</label>
+                        <input type="number" id="quantityInStock" class="form-control" min="0" required />
+                        <div class="text-danger" id="quantityError"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="discountPercentage">Discount Percentage</label>
+                        <input type="number" id="discountPercentage" class="form-control" min="0" max="100" />
+                        <div class="text-danger" id="discountError"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="finalPrice">Final Price</label>
+                        <input type="text" id="finalPrice" class="form-control" readonly />
+                    </div>
+                    
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="saveOrUpdateProduct()">Save</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmationModal" tabindex="-1" role="dialog" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteConfirmationModalLabel">Confirm Deletion</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this product?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteButton">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            // Initialize DataTable with AJAX source
+            $('#productTable').DataTable({
+                ajax: {
+                    url: "/api/ProductsAPI", // API endpoint to fetch products
+                    dataSrc: "" // DataTables expects an array by default, so set dataSrc to an empty string
+                },
+                columns: [
+                    { data: "productId" },
+                    { data: "name" },
+                    { data: "description" },
+                    { data: "price" },
+                    { data: "quantityInStock" },
+                    { data: "discountPercentage" },
+                    {
+                        data: null,
+                        render: function (data, type, row) {
+                            const finalPrice = row.price - (row.price * (row.discountPercentage / 100));
+                            return finalPrice.toFixed(2);
+                        }
+                    },
+                    {
+                        data: null,
+                        render: function (data, type, row) {
+                            return `
+                                <button class="btn btn-info btn-sm" onclick="viewProduct(${row.productId})">View</button>
+                                <button class="btn btn-warning btn-sm" onclick="editProduct(${row.productId})">Edit</button>
+                                        <button class="btn btn-danger btn-sm" onclick="openDeleteConfirmationModal(${row.productId})">Delete</button>
+                            `;
+                        }
+                    }
+                ]
+            });
+        });
+
+        function editProduct(id) {
+            $.ajax({
+                url: `/api/ProductsAPI/${id}`,
+                type: "GET",
+                success: function (product) {
+                    // Set the modal title to "Edit Product"
+                    document.getElementById("productModalLabel").innerText = "Edit Product";
+
+                    // Populate form fields with product data
+                    document.getElementById("productId").value = product.productId;
+                    document.getElementById("name").value = product.name;
+                    // document.getElementById("description").value = product.description;
+                    document.getElementById("price").value = product.price;
+                    document.getElementById("quantityInStock").value = product.quantityInStock;
+                    document.getElementById("discountPercentage").value = product.discountPercentage;
+                    updateFinalPrice();
+
+                    // Open the modal
+                    $('#productModal').modal('show');
+                },
+                error: function () {
+                    alert("An error occurred while fetching the product for editing.");
+                }
+            });
+        }
+
+        function saveOrUpdateProduct() {
+            const productId = document.getElementById("productId").value; // Get the hidden product ID
+            const url = productId ? `/api/ProductsAPI/${productId}` : "/api/ProductsAPI"; // Determine URL
+            const method = productId ? "PUT" : "POST"; // Determine HTTP method
+
+            console.log(method);
+
+            const productData = {
+                productId: productId || undefined, // Only include if updating
+                name: document.getElementById("name").value,
+                // description: document.getElementById("description").value,
+                price: parseFloat(document.getElementById("price").value) || null,
+                quantityInStock: parseInt(document.getElementById("quantityInStock").value) || 0,
+                discountPercentage: parseFloat(document.getElementById("discountPercentage").value) || 0,
+            };
+
+            // Clear previous error messages
+            document.getElementById("nameError").innerText = "";
+            // document.getElementById("descriptionError").innerText = "";
+            document.getElementById("priceError").innerText = "";
+            document.getElementById("quantityError").innerText = "";
+            document.getElementById("discountError").innerText = "";
+
+            $.ajax({
+                url: url,
+                type: method,
+                contentType: "application/json",
+                data: JSON.stringify(productData),
+                success: function () {
+                    $('#productModal').modal('hide'); // Close modal on success
+                    $('#productTable').DataTable().ajax.reload(); // Reload DataTable to show updated data
+                    alert(`Product ${productId ? "updated" : "added"} successfully.`);
+                },
+                error: function (xhr) {
+                    if (xhr.status === 400) {
+                        const errors = xhr.responseJSON.errors;
+
+                        if (errors.Name) {
+                            document.getElementById("nameError").innerText = errors.Name[0];
+                        }
+                        if (errors.Description) {
+                            document.getElementById("descriptionError").innerText = errors.Description[0];
+                        }
+                        if (errors.Price) {
+                            document.getElementById("priceError").innerText = errors.Price[0];
+                        }
+                        if (errors.QuantityInStock) {
+                            document.getElementById("quantityError").innerText = errors.QuantityInStock[0];
+                        }
+                        if (errors.DiscountPercentage) {
+                            document.getElementById("discountError").innerText = errors.DiscountPercentage[0];
+                        }
+                    } else {
+                        alert("An error occurred while saving the product.");
+                    }
+                }
+            });
+        }
+
+
+        function saveProduct() {
+            const productData = {
+                name: document.getElementById("name").value,
+                // description: document.getElementById("description").value,
+                price: parseFloat(document.getElementById("price").value) || null,
+                quantityInStock: parseInt(document.getElementById("quantityInStock").value) || 0,
+                discountPercentage: parseFloat(document.getElementById("discountPercentage").value) || 0,
+            };
+            console.log(productData)
+
+            $.ajax({
+                url: "/api/ProductsAPI", // API endpoint
+                type: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(productData),
+                success: function (response) {
+                    $('#productModal').modal('hide');
+                    fetchProducts();
+                    alert("Product added successfully");
+                },
+                error: function (xhr) {
+                    const errors = xhr.responseJSON.errors;
+                    console.log(errors)
+                    if (errors) {
+                        document.getElementById("nameError").innerText = errors.Name ? errors.Name[0] : "";
+                        document.getElementById("priceError").innerText = errors.Price ? errors.Price[0] : "";
+                    }
+                }
+            });
+        }
+
+        function fetchProducts() {
+            $.getJSON("/api/ProductApi", function (products) {
+                let productTable = $("#productTable tbody");
+                productTable.empty();
+                products.forEach(product => {
+                    productTable.append(`
+                                <tr>
+                                    <td>${product.name}</td>
+                                    <td>${product.price}</td>
+                                </tr>
+                            `);
+                });
+            });
+        }
+
+        document.getElementById("price").addEventListener("input", updateFinalPrice);
+        document.getElementById("discountPercentage").addEventListener("input", updateFinalPrice);
+
+        function updateFinalPrice() {
+            const price = parseFloat(document.getElementById("price").value) || 0;
+            const discount = parseFloat(document.getElementById("discountPercentage").value) || 0;
+
+            // Calculate final price based on price and discount
+            const finalPrice = price - (price * discount / 100);
+            document.getElementById("finalPrice").value = finalPrice.toFixed(2);
+        }
+
+        function resetModal() {
+            document.getElementById("productModalLabel").innerText = "Add Product";
+            document.getElementById("productId").value = "";
+            document.getElementById("name").value = "";
+            // document.getElementById("description").value = "";
+            document.getElementById("price").value = "";
+            document.getElementById("quantityInStock").value = "";
+            document.getElementById("discountPercentage").value = "";
+            document.getElementById("nameError").innerText = "";
+            document.getElementById("descriptionError").innerText = "";
+            document.getElementById("priceError").innerText = "";
+            document.getElementById("quantityError").innerText = "";
+            document.getElementById("discountError").innerText = "";
+        }
+
+        $('#productModal').on('hidden.bs.modal', function () {
+            resetModal();
+        });
+
+        // delete
+
+        let productIdToDelete = null; // Holds the ID of the product to delete
+
+        // Function to open the delete confirmation modal
+        function openDeleteConfirmationModal(id) {
+            productIdToDelete = id; // Store the ID of the product to delete
+            $('#deleteConfirmationModal').modal('show'); // Open the confirmation modal
+        }
+
+        // Function to delete the product after confirmation
+        function confirmDelete() {
+            if (productIdToDelete) {
+                $.ajax({
+                    url: `/api/ProductsAPI/${productIdToDelete}`, // API endpoint with the product ID
+                    type: "DELETE",
+                    success: function (response) {
+                        $('#deleteConfirmationModal').modal('hide'); // Close the modal
+                        alert(response); // Show success message
+                        $('#productTable').DataTable().ajax.reload(); // Reload DataTable to refresh the product list
+                    },
+                    error: function (xhr) {
+                        $('#deleteConfirmationModal').modal('hide'); // Close the modal
+                        if (xhr.status === 404) {
+                            alert("Product not found. It may have already been deleted.");
+                        } else {
+                            alert("An error occurred while deleting the product. Please try again later.");
+                        }
+                    }
+                });
+            }
+        }
+
+        // Attach the confirm delete function to the confirm button in the modal
+        document.getElementById("confirmDeleteButton").addEventListener("click", confirmDelete);
+
+    </script>
+}
