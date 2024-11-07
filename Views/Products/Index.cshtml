@@ -4,7 +4,7 @@
 
 <h2>Product Management</h2>
 
-<button type="button" class="btn btn-primary" data-toggle="modal" data-target="#productModal">
+<button type="button" class="btn btn-primary mb-2" data-toggle="modal" data-target="#productModal">
     Add Product
 </button>
 
@@ -99,7 +99,9 @@
 
 
 @section Scripts {
-    <script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/ProductManagement.js" asp-append-version="true"></script>
+   @*  <script>
         $(document).ready(function () {
             // Initialize DataTable with AJAX source
             $('#productTable').DataTable({
@@ -220,53 +222,6 @@
             });
         }
 
-
-        function saveProduct() {
-            const productData = {
-                name: document.getElementById("name").value,
-                // description: document.getElementById("description").value,
-                price: parseFloat(document.getElementById("price").value) || null,
-                quantityInStock: parseInt(document.getElementById("quantityInStock").value) || 0,
-                discountPercentage: parseFloat(document.getElementById("discountPercentage").value) || 0,
-            };
-            console.log(productData)
-
-            $.ajax({
-                url: "/api/ProductsAPI", // API endpoint
-                type: "POST",
-                contentType: "application/json",
-                data: JSON.stringify(productData),
-                success: function (response) {
-                    $('#productModal').modal('hide');
-                    fetchProducts();
-                    alert("Product added successfully");
-                },
-                error: function (xhr) {
-                    const errors = xhr.responseJSON.errors;
-                    console.log(errors)
-                    if (errors) {
-                        document.getElementById("nameError").innerText = errors.Name ? errors.Name[0] : "";
-                        document.getElementById("priceError").innerText = errors.Price ? errors.Price[0] : "";
-                    }
-                }
-            });
-        }
-
-        function fetchProducts() {
-            $.getJSON("/api/ProductApi", function (products) {
-                let productTable = $("#productTable tbody");
-                productTable.empty();
-                products.forEach(product => {
-                    productTable.append(`
-                                <tr>
-                                    <td>${product.name}</td>
-                                    <td>${product.price}</td>
-                                </tr>
-                            `);
-                });
-            });
-        }
-
         document.getElementById("price").addEventListener("input", updateFinalPrice);
         document.getElementById("discountPercentage").addEventListener("input", updateFinalPrice);
 
@@ -334,5 +289,5 @@
         // Attach the confirm delete function to the confirm button in the modal
         document.getElementById("confirmDeleteButton").addEventListener("click", confirmDelete);
 
-    </script>
-}
+    </script>*@
+} 

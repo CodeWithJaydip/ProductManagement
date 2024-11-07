@@ -48,7 +48,6 @@ namespace ProductManagement.Controllers
         }
 
         // PUT: api/ProductsAPI/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
         public async Task<IActionResult> EditProduct(int id, Product product)
         {
@@ -68,7 +67,7 @@ namespace ProductManagement.Controllers
             {
                 var existingProduct = await _productRepository.UpdateProductAsync(product);
 
-                if (existingProduct)
+                if (!existingProduct)
                 {
                     _logger.LogWarning("Product not found for update. Product ID: {ProductId}", id);
                     return NotFound("Product not found.");
@@ -86,7 +85,6 @@ namespace ProductManagement.Controllers
         }
 
         // POST: api/ProductsAPI
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         public async Task<ActionResult<Product>> PostProduct(Product product)
         {
