@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ProductManagement.Data;
+using ProductManagement.Data.Repository;
 using ProductManagement.Models;
 
 namespace ProductManagement.Controllers
@@ -14,25 +15,29 @@ namespace ProductManagement.Controllers
     [ApiController]
     public class ProductsAPIController : ControllerBase
     {
-        private readonly AppDbContext _context;
 
-        public ProductsAPIController(AppDbContext context)
+        private readonly ILogger<ProductsAPIController> _logger;
+        private readonly IProductRepository _productRepository;
+
+        public ProductsAPIController(IProductRepository productRepository, ILogger<ProductsAPIController> logger)
         {
-            _context = context;
+            _productRepository = productRepository;
+            _logger = logger;
         }
 
         // GET: api/ProductsAPI
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
-            return await _context.Products.ToListAsync();
+            var products = await _productRepository.GetAllProductsAsync();
+            return Ok(products);
         }
 
         // GET: api/ProductsAPI/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
+            var product = await _productRepository.GetProductByIdAsync(id);
 
             if (product == null)
             {
@@ -49,45 +54,32 @@ namespace ProductManagement.Controllers
         {
             if (id != product.ProductId)
             {
-                //_logger.LogWarning("Product ID in the route does not match the ID in the product data. Route ID: {Id}, Product ID: {ProductId}", id, product.ProductId);
+                _logger.LogWarning("Product ID in the route does not match the ID in the product data. Route ID: {Id}, Product ID: {ProductId}", id, product.ProductId);
                 return BadRequest("Product ID mismatch.");
             }
 
             if (!ModelState.IsValid)
             {
-                //_logger.LogWarning("Model validation failed for product update. ModelState: {@ModelState}", ModelState);
+                _logger.LogWarning("Model validation failed for product update. ModelState: {@ModelState}", ModelState);
                 return BadRequest(ModelState);
             }
 
             try
             {
-                var existingProduct = await _context.Products.FindAsync(id);
+                var existingProduct = await _productRepository.UpdateProductAsync(product);
 
-                if (existingProduct == null)
+                if (existingProduct)
                 {
-                    //_logger.LogWarning("Product not found for update. Product ID: {ProductId}", id);
+                    _logger.LogWarning("Product not found for update. Product ID: {ProductId}", id);
                     return NotFound("Product not found.");
                 }
-
-                // Update product fields
-                existingProduct.Name = product.Name;
-                existingProduct.Description = product.Description;
-                existingProduct.Price = product.Price;
-                existingProduct.QuantityInStock = product.QuantityInStock;
-                existingProduct.DiscountPercentage = product.DiscountPercentage;
-                existingProduct.UpdatedAt = DateTime.UtcNow;
-
-                await _context.SaveChangesAsync();
-
-                //_logger.LogInformation("Product updated successfully. Product ID: {ProductId}", product.ProductId);
-
+                _logger.LogInformation("Product updated successfully. Product ID: {ProductId}", product.ProductId);
                 return Ok(existingProduct);
             }
             catch (Exception ex)
             {
                 // Log the exception details
-                //_logger.LogError(ex, "An error occurred while updating the product. Product ID: {ProductId}, Product Data: {@Product}", id, product);
-
+                _logger.LogError(ex, "An error occurred while updating the product. Product ID: {ProductId}, Product Data: {@Product}", id, product);
                 // Return a generic error response
                 return StatusCode(500, "An error occurred while updating the product. Please try again later.");
             }
@@ -104,11 +96,8 @@ namespace ProductManagement.Controllers
                 {
                     return BadRequest(ModelState); // Return validation errors to the client
                 }
-                product.CreatedAt = DateTime.Now;
-                _context.Products.Add(product);
-                await _context.SaveChangesAsync();
-
-                return CreatedAtAction("GetProduct", new { id = product.ProductId }, product);
+                var createdProduct = await _productRepository.AddProductAsync(product);
+                return CreatedAtAction("GetProduct", new { id = createdProduct.ProductId }, product);
             }
             catch (Exception)
             {
@@ -124,29 +113,19 @@ namespace ProductManagement.Controllers
         {
             try
             {
-                var product = await _context.Products.FindAsync(id);
-                if (product == null)
+                var deleteSuccess = await _productRepository.DeleteProductAsync(id);
+                if (!deleteSuccess)
                 {
-                    //_logger.LogWarning("Product not found for deletion. Product ID: {ProductId}", id);
                     return NotFound("Product not found.");
                 }
 
-                _context.Products.Remove(product);
-                await _context.SaveChangesAsync();
-
-                //_logger.LogInformation("Product deleted successfully. Product ID: {ProductId}", id);
                 return Ok("Product deleted successfully.");
             }
             catch (Exception ex)
             {
-                //_logger.LogError(ex, "An error occurred while deleting the product. Product ID: {ProductId}", id);
+                _logger.LogError(ex, "An error occurred while deleting the product. Product ID: {ProductId}", id);
                 return StatusCode(500, "An error occurred while deleting the product. Please try again later.");
             }
-        }
-
-        private bool ProductExists(int id)
-        {
-            return _context.Products.Any(e => e.ProductId == id);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using ProductManagement.Helpers.CustomValidation;
+using System.ComponentModel.DataAnnotations;
 
 namespace ProductManagement.Models
 {
@@ -18,6 +19,7 @@ namespace ProductManagement.Models
 
         [Required]
         [Range(0, int.MaxValue, ErrorMessage = "Quantity InStock must be a positive number.")]
+        [PositiveInteger(ErrorMessage = "Quantity InStock must be a whole number.")]
         public int QuantityInStock { get; set; }
 
         [Range(0, 100.0, ErrorMessage = "Discount Percentage must be between 0% and 100%")]
